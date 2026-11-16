@@ -1,0 +1,19 @@
+# Ambientes e cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Arquivos de ambiente e segredos (não subir para o GitHub!)
+.env
+
+# Banco de dados SQLite local
+*.db
+deals.db
+
+# Logs e arquivos do sistema
+*.log
+.DS_Store
+Thumbs.db
