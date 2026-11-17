@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: periquito-promocoes-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py --loop
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: MIN_DISCOUNT_PCT
+        value: "20"
+      - key: ACTIVE_SEND_MINUTES
+        value: "5"
+      - key: REST_MINUTES
+        value: "10"
+      - key: POST_DELAY_SECONDS
+        value: "6"
+      - key: REPOST_AFTER_HOURS
+        value: "12"

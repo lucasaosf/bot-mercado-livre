@@ -84,4 +84,33 @@ Você pode alterar o ritmo e filtros a qualquer momento no arquivo `.env`:
 - `ACTIVE_SEND_MINUTES`: Duração da janela ativa de envios sem parar (padrão: `5` minutos).
 - `REST_MINUTES`: Tempo de descanso antes de iniciar o próximo ciclo (padrão: `10` minutos).
 - `POST_DELAY_SECONDS`: Intervalo entre mensagens no Telegram para manter o ritmo sem risco de bloqueio (padrão: `6` segundos).
-- `REPOST_AFTER_DAYS`: Dias que o bot deve esperar antes de permitir reenviar o mesmo produto caso continue em oferta (padrão: `3`).
+- `REPOST_AFTER_HOURS`: Horas de carência antes de permitir reenviar o mesmo produto (padrão: `12` horas).
+
+---
+
+## ☁️ Como Rodar 24/7 Grátis na Nuvem (Render + UptimeRobot)
+
+Para que o bot funcione **24 horas por dia sem precisar do seu PC ligado**:
+
+1. Crie uma conta gratuita no **[Render.com](https://render.com)** clicando em **Continue with GitHub**.
+2. Clique no botão **New +** e selecione **Web Service**.
+3. Selecione o repositório `lucasaosf/bot-mercado-livre`.
+4. Preencha as configurações:
+   - **Name:** `periquito-promocoes`
+   - **Runtime:** `Python 3`
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `python bot.py --loop`
+   - **Instance Type:** `Free`
+5. Na seção **Environment Variables**, adicione as suas chaves do `.env`:
+   - `MATT_TOOL`
+   - `MATT_WORD`
+   - `AMAZON_AFFILIATE_TAG`
+   - `ALIEXPRESS_AFF_FSK`
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+6. Clique em **Create Web Service**. O Render irá iniciar o bot e fornecer uma URL pública (ex: `https://periquito-promocoes.onrender.com`).
+7. **Para o Render nunca dormir:**
+   - Acesse **[UptimeRobot.com](https://uptimerobot.com)** (grátis).
+   - Crie um novo monitor do tipo `HTTP(s)`.
+   - Cole a URL gerada pelo Render e defina o intervalo de monitoramento para **5 minutos**.
+   - Pronto! O bot rodará 24 horas por dia, 7 dias por semana, 100% de graça!

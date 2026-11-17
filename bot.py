@@ -1,6 +1,9 @@
 import os
 import sys
 import time
+import json
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timedelta
 import argparse
 
@@ -173,10 +176,30 @@ def run_active_window(preview_only: bool = False):
     print(f"   Distribuição rigorosa 1:1:1: Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
     print("=" * 65)
     return posted_in_window
-    print(f"   Ofertas enviadas com sucesso: {posted_in_window}")
-    print(f"   Ofertas ignoradas por repetição: {skipped_duplicates}")
-    print("=" * 65)
-    return posted_in_window
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        body = {
+            "status": "online",
+            "bot": "Periquito Promocoes",
+            "timestamp": datetime.now().isoformat()
+        }
+        self.wfile.write(json.dumps(body).encode("utf-8"))
+
+    def log_message(self, format, *args):
+        pass
+
+def start_keep_alive_server(port: int = 8080):
+    try:
+        server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        print(f"🌐 [Keep-Alive Web Server] Ativo na porta {port} (Permite rodar 24/7 no Render/UptimeRobot)")
+    except Exception as e:
+        print(f"⚠️ [Keep-Alive Web Server] Não foi possível iniciar na porta {port}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Bot de Ofertas Mercado Livre com Ciclos de 5min Envio / 10min Descanso")
@@ -187,6 +210,8 @@ def main():
     args = parser.parse_args()
 
     init_db()
+    web_port = int(os.getenv("PORT", "8080"))
+    start_keep_alive_server(port=web_port)
 
     if args.preview:
         run_active_window(preview_only=True)

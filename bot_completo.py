@@ -20,6 +20,8 @@ import re
 import socket
 import sqlite3
 import json
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.parse
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -645,8 +647,34 @@ def run_active_window():
     print(f"   Distribuição rigorosa 1:1:1: Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
     return posted
 
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        body = {
+            "status": "online",
+            "bot": "Periquito Promocoes",
+            "timestamp": datetime.now().isoformat()
+        }
+        self.wfile.write(json.dumps(body).encode("utf-8"))
+
+    def log_message(self, format, *args):
+        pass
+
+def start_keep_alive_server(port: int = 8080):
+    try:
+        server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        print(f"🌐 [Keep-Alive Web Server] Ativo na porta {port} (Permite rodar 24/7 no Render/UptimeRobot)")
+    except Exception as e:
+        print(f"⚠️ [Keep-Alive Web Server] Não foi possível iniciar na porta {port}: {e}")
+
 def main():
     init_db()
+    web_port = int(os.getenv("PORT", "8080"))
+    start_keep_alive_server(port=web_port)
     print("==================================================================")
     print("   ROBÔ DE OFERTAS MULTI-LOJAS (MERCADO LIVRE + AMAZON + ALIEXPRESS)  ")
     print(f"   Ciclo: {ACTIVE_SEND_MINUTES}min disparando -> {REST_MINUTES}min descansando")
