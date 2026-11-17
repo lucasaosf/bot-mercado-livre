@@ -9,10 +9,25 @@ urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 def format_telegram_caption(deal: Deal) -> str:
     """Formata o texto da mensagem no padrão clássico de canais de promoções."""
+    is_amazon = getattr(deal, "source", "") == "amazon"
+    
+    if is_amazon:
+        if deal.discount_pct:
+            header = f"📦 <b>ACHADO NA AMAZON — {deal.discount_pct}% OFF!</b>"
+        else:
+            header = "📦 <b>MAIS VENDIDOS DA AMAZON!</b>"
+        store_name = "Amazon"
+    else:
+        if deal.discount_pct:
+            header = f"🔥 <b>OFERTA MERCADO LIVRE — {deal.discount_pct}% OFF!</b>"
+        else:
+            header = "🔥 <b>MAIS VENDIDOS DO MERCADO LIVRE!</b>"
+        store_name = "Mercado Livre"
+
     lines = [
-        f"🔥 <b>OFERTA IMPERDÍVEL — {deal.discount_pct}% OFF!</b>",
+        header,
         "",
-        f"📦 <b>{deal.title}</b>",
+        f"🏷️ <b>{deal.title}</b>",
         ""
     ]
 
@@ -25,8 +40,8 @@ def format_telegram_caption(deal: Deal) -> str:
         lines.append(f"💳 {deal.installments}")
 
     lines.append("")
-    lines.append(f"🛒 <b>Compre com desconto aqui:</b>")
-    lines.append(f"👉 <a href=\"{deal.affiliate_url}\">Clique para ver no Mercado Livre</a>")
+    lines.append("🛒 <b>Compre com desconto aqui:</b>")
+    lines.append(f"👉 <a href=\"{deal.affiliate_url}\">Clique para ver na {store_name}</a>")
     lines.append("")
     lines.append("⚠️ <i>Preços e estoque sujeitos a alteração rápida!</i>")
 
@@ -39,6 +54,8 @@ def send_deal_to_telegram(bot_token: str, chat_id: str, deal: Deal) -> bool:
         return False
 
     caption = format_telegram_caption(deal)
+    is_amazon = getattr(deal, "source", "") == "amazon"
+    btn_text = "🛒 Ver Oferta na Amazon" if is_amazon else "🛒 Ver Oferta no Mercado Livre"
 
     # Se houver imagem, envia como sendPhoto
     if deal.image_url:
@@ -51,7 +68,7 @@ def send_deal_to_telegram(bot_token: str, chat_id: str, deal: Deal) -> bool:
             "reply_markup": {
                 "inline_keyboard": [
                     [
-                        {"text": "🛒 Ver Oferta no Mercado Livre", "url": deal.affiliate_url}
+                        {"text": btn_text, "url": deal.affiliate_url}
                     ]
                 ]
             }
@@ -67,7 +84,7 @@ def send_deal_to_telegram(bot_token: str, chat_id: str, deal: Deal) -> bool:
             "reply_markup": {
                 "inline_keyboard": [
                     [
-                        {"text": "🛒 Ver Oferta no Mercado Livre", "url": deal.affiliate_url}
+                        {"text": btn_text, "url": deal.affiliate_url}
                     ]
                 ]
             }

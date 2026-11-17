@@ -1,18 +1,21 @@
-# 🛒 Bot de Melhores Ofertas do Mercado Livre (com Afiliados)
+# 🛒 Bot de Melhores Ofertas do Mercado Livre + Amazon (com Afiliados)
 
-Este bot monitora automaticamente os **produtos mais vendidos e com maiores descontos** do Mercado Livre, filtra as melhores ofertas e publica automaticamente cards promocionais com foto, preço, cálculo de desconto e tags de afiliado em canais ou grupos do **Telegram**.
+Este bot monitora automaticamente os **produtos mais vendidos e com maiores descontos** do **Mercado Livre** e da **Amazon Brasil**, filtra as melhores ofertas e publica automaticamente cards promocionais com foto, preço, cálculo de desconto e tags de afiliado em canais ou grupos do **Telegram**.
 
 ---
 
-## 🔑 Configuração de Afiliado
+## 🔑 Configuração de Afiliados
 
-Para que as comissões sejam atribuídas à sua conta de afiliado do Mercado Livre, basta preencher as suas credenciais no arquivo `.env`:
+Para que as comissões sejam atribuídas corretamente a cada plataforma, basta preencher as suas credenciais no arquivo `.env`:
 
-- **`MATT_TOOL`**: ID da sua ferramenta de afiliado
-- **`MATT_WORD`**: Seu identificador ou palavra-chave de afiliado
+### Mercado Livre
+- **`MATT_TOOL`**: ID da ferramenta de afiliado
+- **`MATT_WORD`**: Palavra-chave/identificador de afiliado
 
-Todos os links gerados pelo bot receberão automaticamente a terminação:
-`?matt_tool=SEU_MATT_TOOL&matt_word=SEU_MATT_WORD`
+### Amazon Brasil
+- **`AMAZON_AFFILIATE_TAG`**: Tag de associado da Amazon (ex: `suatag-20`)
+
+Os links gerados recebem automaticamente os parâmetros de rastreamento de cada plataforma.
 
 ---
 

@@ -31,6 +31,7 @@ sys.stdout = DualLogger(log_file_path)
 sys.stderr = sys.stdout
 
 from scraper import MercadoLivreScraper
+from amazon_scraper import AmazonScraper
 from database import init_db, is_already_posted, mark_as_posted, get_posted_count
 import config
 from telegram_sender import send_deal_to_telegram
@@ -39,6 +40,7 @@ def run_active_window(preview_only: bool = False):
     """
     Executa a janela ativa de envios:
     Envia links sem parar durante config.ACTIVE_SEND_MINUTES minutos (padrão: 5 minutos).
+    Alterna ofertas do Mercado Livre e da Amazon.
     """
     duration_seconds = config.ACTIVE_SEND_MINUTES * 60
     start_time = time.time()
@@ -48,14 +50,39 @@ def run_active_window(preview_only: bool = False):
     print("=" * 65)
     print(f"🚀 [FASE ATIVA INICIADA] ENVIANDO LINKS POR {config.ACTIVE_SEND_MINUTES} MINUTOS SEM PARAR")
     print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento previsto: {end_dt.strftime('%H:%M:%S')}")
+    print(f"   Fontes: Mercado Livre (Afiliado Lucas) + Amazon (Afiliado Pedro)")
     print(f"   Desconto mínimo: {config.MIN_DISCOUNT_PCT}% | Intervalo entre posts: {config.POST_DELAY_SECONDS}s")
     print(f"   Total já catalogado no banco: {get_posted_count()} produtos")
     print("=" * 65)
 
-    scraper = MercadoLivreScraper(matt_tool=config.MATT_TOOL, matt_word=config.MATT_WORD)
-    deals = scraper.get_mais_vendidos(min_discount_pct=config.MIN_DISCOUNT_PCT)
+    # 1. Coleta Mercado Livre
+    meli_deals = []
+    try:
+        meli_scraper = MercadoLivreScraper(matt_tool=config.MATT_TOOL, matt_word=config.MATT_WORD)
+        meli_deals = meli_scraper.get_mais_vendidos(min_discount_pct=config.MIN_DISCOUNT_PCT)
+        print(f"📦 [Mercado Livre] {len(meli_deals)} ofertas coletadas.")
+    except Exception as e:
+        print(f"⚠️ [Mercado Livre] Erro na coleta: {e}")
 
-    if not deals:
+    # 2. Coleta Amazon
+    amazon_deals = []
+    try:
+        amazon_scraper = AmazonScraper(affiliate_tag=config.AMAZON_AFFILIATE_TAG)
+        amazon_deals = amazon_scraper.get_mais_vendidos()
+        print(f"📦 [Amazon] {len(amazon_deals)} produtos mais vendidos coletados.")
+    except Exception as e:
+        print(f"⚠️ [Amazon] Erro na coleta: {e}")
+
+    # 3. Intercala as ofertas das duas lojas para diversificar o grupo
+    combined_deals = []
+    max_len = max(len(meli_deals), len(amazon_deals))
+    for i in range(max_len):
+        if i < len(meli_deals):
+            combined_deals.append(meli_deals[i])
+        if i < len(amazon_deals):
+            combined_deals.append(amazon_deals[i])
+
+    if not combined_deals:
         print("⚠️ Nenhuma oferta encontrada com os critérios definidos.")
         return 0
 
@@ -64,8 +91,8 @@ def run_active_window(preview_only: bool = False):
     seen_in_window = set()
 
     deal_index = 0
-    while time.time() < end_time and deal_index < len(deals):
-        deal = deals[deal_index]
+    while time.time() < end_time and deal_index < len(combined_deals):
+        deal = combined_deals[deal_index]
         deal_index += 1
 
         if deal.item_id in seen_in_window or is_already_posted(deal.item_id, max_days=config.REPOST_AFTER_DAYS):
@@ -76,8 +103,9 @@ def run_active_window(preview_only: bool = False):
         remaining_seconds = max(0, int(end_time - time.time()))
         rem_min = remaining_seconds // 60
         rem_sec = remaining_seconds % 60
+        loja_nome = "AMAZON" if getattr(deal, "source", "") == "amazon" else "MERCADO LIVRE"
 
-        print(f"\n🎯 [POSTANDO #{posted_in_window + 1}] ({deal.discount_pct}% OFF) - Faltam {rem_min:02d}:{rem_sec:02d}")
+        print(f"\n🎯 [POSTANDO #{posted_in_window + 1} - {loja_nome}] ({deal.discount_pct}% OFF) - Faltam {rem_min:02d}:{rem_sec:02d}")
         print(f"   Título: {deal.title}")
         orig = f" (De R$ {deal.original_price:.2f})" if deal.original_price else ""
         print(f"   Preço: R$ {deal.price:.2f}{orig}")

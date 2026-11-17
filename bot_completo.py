@@ -1,8 +1,12 @@
 """
 =============================================================================
-🤖 BOT DE OFERTAS MERCADO LIVRE (AFILIADOS + TELEGRAM) - SCRIPT ÚNICO
+🤖 BOT DE OFERTAS MERCADO LIVRE + AMAZON (AFILIADOS + TELEGRAM) - ARQUIVO ÚNICO
 =============================================================================
 Script completo e autocontido para rodar facilmente em painéis Python, VPS ou nuvem.
+Fontes:
+  - Mercado Livre (com tags de afiliado Mercado Livre)
+  - Amazon Brasil (com tag de afiliado Amazon)
+
 Dependências necessárias:
     pip install requests curl_cffi beautifulsoup4 urllib3
 =============================================================================
@@ -23,7 +27,7 @@ import urllib3.util.connection as urllib3_cn
 from bs4 import BeautifulSoup
 from curl_cffi import requests as cffi_requests
 
-# 1. FORÇA RESOLUÇÃO IPV4 (Evita travamentos de conexão com a API do Telegram)
+# 1. FORÇA RESOLUÇÃO IPV4 (Evita travamentos de rota com a API do Telegram)
 urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 # =============================================================================
@@ -35,6 +39,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "SEU_CHAT_ID_AQUI")
 # Parâmetros de Afiliado Mercado Livre
 MATT_TOOL = os.getenv("MATT_TOOL", "SEU_MATT_TOOL_AQUI")
 MATT_WORD = os.getenv("MATT_WORD", "SEU_MATT_WORD_AQUI")
+
+# Tag de Afiliado Amazon
+AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "SEU_TAG_AMAZON_AQUI")
 
 # Filtros e Ritmo de Envio
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))      # Desconto mínimo (%)
@@ -95,7 +102,7 @@ def get_posted_count() -> int:
         return row[0] if row else 0
 
 # =============================================================================
-# 🕷️ SCRAPER DE OFERTAS DO MERCADO LIVRE
+# 📦 ESTRUTURA DE DADOS UNIFICADA
 # =============================================================================
 @dataclass
 class Deal:
@@ -108,7 +115,11 @@ class Deal:
     clean_url: str
     affiliate_url: str
     installments: str = ""
+    source: str = "mercadolivre"
 
+# =============================================================================
+# 🕷️ SCRAPER MERCADO LIVRE
+# =============================================================================
 class MercadoLivreScraper:
     def __init__(self, matt_tool: str = "", matt_word: str = ""):
         self.matt_tool = matt_tool
@@ -145,11 +156,10 @@ class MercadoLivreScraper:
         try:
             res = cffi_requests.get(url, headers=self.headers, impersonate="chrome", timeout=15)
         except Exception as e:
-            print(f"[Scraper] Erro ao acessar Mercado Livre: {e}")
+            print(f"[Mercado Livre] Erro ao acessar: {e}")
             return []
 
         if res.status_code != 200:
-            print(f"[Scraper] Status inesperado: {res.status_code}")
             return []
 
         soup = BeautifulSoup(res.text, "html.parser")
@@ -216,20 +226,123 @@ class MercadoLivreScraper:
                 image_url=image_url,
                 clean_url=clean_url,
                 affiliate_url=affiliate_url,
-                installments=installments
+                installments=installments,
+                source="mercadolivre"
             ))
 
         deals.sort(key=lambda d: d.discount_pct, reverse=True)
         return deals
 
 # =============================================================================
-# 📤 DISPARADOR TELEGRAM
+# 🕷️ SCRAPER AMAZON BRASIL
+# =============================================================================
+class AmazonScraper:
+    def __init__(self, affiliate_tag: str = ""):
+        self.affiliate_tag = affiliate_tag
+        self.headers = {
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        }
+
+    def generate_affiliate_link(self, asin: str):
+        clean_url = f"https://www.amazon.com.br/dp/{asin}"
+        if self.affiliate_tag:
+            return f"{clean_url}?tag={self.affiliate_tag}&linkCode=as4", clean_url
+        return clean_url, clean_url
+
+    def _parse_price(self, text: str) -> Optional[float]:
+        if not text:
+            return None
+        match = re.search(r"R\$\s*([\d\.,]+)", text)
+        if not match:
+            return None
+        cleaned = match.group(1).replace(".", "").replace(",", ".")
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+
+    def get_mais_vendidos(self, categories: Optional[List[str]] = None) -> List[Deal]:
+        if categories is None:
+            categories = ["", "computers", "electronics", "kitchen", "automotive", "hi"]
+
+        deals: List[Deal] = []
+        seen_asins = set()
+
+        for cat in categories:
+            url = f"https://www.amazon.com.br/gp/bestsellers/{cat}".rstrip("/")
+            try:
+                res = cffi_requests.get(url, headers=self.headers, impersonate="chrome", timeout=12)
+            except Exception as e:
+                continue
+
+            if res.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(res.text, "html.parser")
+            cards = soup.select("[data-asin]")
+
+            for card in cards:
+                asin = card.get("data-asin")
+                if not asin or len(asin) != 10 or asin in seen_asins:
+                    continue
+
+                seen_asins.add(asin)
+
+                t_el = card.select_one(".p13n-sc-truncate, ._cDEzb_p13n-sc-css-line-clamp-1_1Fn1y, ._cDEzb_p13n-sc-css-line-clamp-2_EWgtZ")
+                img_el = card.select_one("img")
+                title = t_el.text.strip() if t_el else (img_el.get("alt") if img_el else "")
+                if not title or len(title) < 5:
+                    continue
+
+                img_url = img_el.get("src") if img_el else ""
+
+                price_el = card.select_one("._cDEzb_p13n-sc-price_3mJ9Z, .a-price .a-offscreen, .a-color-price")
+                price_str = price_el.text.strip() if price_el else ""
+                price = self._parse_price(price_str)
+                if not price or price <= 0:
+                    continue
+
+                original_price = None
+                discount_pct = 0
+                prev_price_el = card.select_one(".a-text-price .a-offscreen")
+                if prev_price_el:
+                    original_price = self._parse_price(prev_price_el.text.strip())
+                    if original_price and original_price > price:
+                        discount_pct = int(round(((original_price - price) / original_price) * 100))
+
+                affiliate_url, clean_url = self.generate_affiliate_link(asin)
+
+                deals.append(Deal(
+                    item_id=asin,
+                    title=title,
+                    price=price,
+                    original_price=original_price,
+                    discount_pct=discount_pct,
+                    image_url=img_url,
+                    clean_url=clean_url,
+                    affiliate_url=affiliate_url,
+                    source="amazon"
+                ))
+
+        return deals
+
+# =============================================================================
+# 📤 DISPARADOR TELEGRAM UNIFICADO
 # =============================================================================
 def format_caption(deal: Deal) -> str:
+    is_amazon = deal.source == "amazon"
+    if is_amazon:
+        header = f"📦 <b>ACHADO NA AMAZON — {deal.discount_pct}% OFF!</b>" if deal.discount_pct else "📦 <b>MAIS VENDIDOS DA AMAZON!</b>"
+        store_name = "Amazon"
+    else:
+        header = f"🔥 <b>OFERTA MERCADO LIVRE — {deal.discount_pct}% OFF!</b>" if deal.discount_pct else "🔥 <b>MAIS VENDIDOS DO MERCADO LIVRE!</b>"
+        store_name = "Mercado Livre"
+
     lines = [
-        f"🔥 <b>OFERTA IMPERDÍVEL — {deal.discount_pct}% OFF!</b>",
+        header,
         "",
-        f"📦 <b>{deal.title}</b>",
+        f"🏷️ <b>{deal.title}</b>",
         ""
     ]
     if deal.original_price and deal.original_price > deal.price:
@@ -242,7 +355,7 @@ def format_caption(deal: Deal) -> str:
 
     lines.append("")
     lines.append("🛒 <b>Compre com desconto aqui:</b>")
-    lines.append(f"👉 <a href=\"{deal.affiliate_url}\">Clique para ver no Mercado Livre</a>")
+    lines.append(f"👉 <a href=\"{deal.affiliate_url}\">Clique para ver na {store_name}</a>")
     lines.append("")
     lines.append("⚠️ <i>Preços e estoque sujeitos a alteração rápida!</i>")
     return "\n".join(lines)
@@ -253,13 +366,15 @@ def send_telegram(deal: Deal) -> bool:
         return False
 
     caption = format_caption(deal)
+    btn_text = "🛒 Ver Oferta na Amazon" if deal.source == "amazon" else "🛒 Ver Oferta no Mercado Livre"
+
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "caption": caption,
         "parse_mode": "HTML",
         "reply_markup": {
             "inline_keyboard": [
-                [{"text": "🛒 Ver Oferta no Mercado Livre", "url": deal.affiliate_url}]
+                [{"text": btn_text, "url": deal.affiliate_url}]
             ]
         }
     }
@@ -275,7 +390,7 @@ def send_telegram(deal: Deal) -> bool:
         r = requests.post(url, json=payload, timeout=15)
         data = r.json()
         if data.get("ok"):
-            print(f"[Telegram] Enviado com sucesso: {deal.title[:40]}...")
+            print(f"[Telegram] Enviado com sucesso ({deal.source.upper()}): {deal.title[:40]}...")
             return True
         else:
             print(f"[Telegram] Falha ao enviar: {data.get('description')}")
@@ -285,7 +400,7 @@ def send_telegram(deal: Deal) -> bool:
         return False
 
 # =============================================================================
-# 🚀 MOTOR DE EXECUÇÃO EM CICLOS (5min Envio / 10min Descanso)
+# 🚀 MOTOR DO CICLO (5min Envio / 10min Descanso)
 # =============================================================================
 def run_active_window():
     duration_seconds = ACTIVE_SEND_MINUTES * 60
@@ -294,22 +409,38 @@ def run_active_window():
 
     print("=" * 65)
     print(f"🚀 [FASE ATIVA] ENVIANDO LINKS POR {ACTIVE_SEND_MINUTES} MINUTOS SEM PARAR")
-    print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento previsto: {end_dt.strftime('%H:%M:%S')}")
-    print(f"   Desconto mínimo: {MIN_DISCOUNT_PCT}% | Intervalo entre posts: {POST_DELAY_SECONDS}s")
+    print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento: {end_dt.strftime('%H:%M:%S')}")
+    print(f"   Fontes: Mercado Livre + Amazon")
     print(f"   Catalogados no banco: {get_posted_count()} produtos")
     print("=" * 65)
 
-    scraper = MercadoLivreScraper(matt_tool=MATT_TOOL, matt_word=MATT_WORD)
-    deals = scraper.get_mais_vendidos(min_discount_pct=MIN_DISCOUNT_PCT)
+    # 1. Coleta Mercado Livre
+    meli_scraper = MercadoLivreScraper(matt_tool=MATT_TOOL, matt_word=MATT_WORD)
+    meli_deals = meli_scraper.get_mais_vendidos(min_discount_pct=MIN_DISCOUNT_PCT)
+    print(f"📦 [Mercado Livre] {len(meli_deals)} ofertas coletadas.")
 
-    if not deals:
+    # 2. Coleta Amazon
+    amazon_scraper = AmazonScraper(affiliate_tag=AMAZON_AFFILIATE_TAG)
+    amazon_deals = amazon_scraper.get_mais_vendidos()
+    print(f"📦 [Amazon] {len(amazon_deals)} mais vendidos coletados.")
+
+    # 3. Intercala as ofertas
+    combined_deals = []
+    max_len = max(len(meli_deals), len(amazon_deals))
+    for i in range(max_len):
+        if i < len(meli_deals):
+            combined_deals.append(meli_deals[i])
+        if i < len(amazon_deals):
+            combined_deals.append(amazon_deals[i])
+
+    if not combined_deals:
         print("⚠️ Nenhuma oferta encontrada nesta busca.")
         return 0
 
     posted = 0
     seen = set()
 
-    for deal in deals:
+    for deal in combined_deals:
         if time.time() >= end_time:
             break
 
@@ -318,7 +449,7 @@ def run_active_window():
 
         seen.add(deal.item_id)
         rem = max(0, int(end_time - time.time()))
-        print(f"\n🎯 [POSTANDO #{posted + 1}] ({deal.discount_pct}% OFF) - Faltam {rem//60:02d}:{rem%60:02d}")
+        print(f"\n🎯 [POSTANDO #{posted + 1} - {deal.source.upper()}] - Faltam {rem//60:02d}:{rem%60:02d}")
         print(f"   {deal.title[:65]}...")
         print(f"   Preço: R$ {deal.price:.2f} | Link: {deal.affiliate_url}")
 
@@ -336,7 +467,7 @@ def run_active_window():
 def main():
     init_db()
     print("==================================================================")
-    print("   ROBÔ DE OFERTAS MERCADO LIVRE - INICIALIZADO COM SUCESSO       ")
+    print("   ROBÔ DE OFERTAS MERCADO LIVRE + AMAZON - INICIALIZADO          ")
     print(f"   Ciclo: {ACTIVE_SEND_MINUTES}min disparando -> {REST_MINUTES}min descansando")
     print("==================================================================")
 
@@ -354,7 +485,7 @@ def main():
             break
         except Exception as e:
             print(f"\n⚠️ Ocorreu um erro no ciclo #{ciclo}: {e}")
-            print(f"Aguardando 1 minuto antes de tentar novamente...")
+            print("Aguardando 1 minuto antes de tentar novamente...")
             time.sleep(60)
 
 if __name__ == "__main__":

@@ -1,11 +1,15 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+load_dotenv(dotenv_path=env_path)
 
 # Credenciais de Afiliado Mercado Livre (obtidas no .env)
 MATT_TOOL = os.getenv("MATT_TOOL", "")
 MATT_WORD = os.getenv("MATT_WORD", "")
+
+# Credenciais de Afiliado Amazon (obtidas no .env)
+AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
 
 # Filtros de Ofertas e Ciclos de Envio
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # Desconto mínimo (%)
