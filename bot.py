@@ -32,6 +32,7 @@ sys.stderr = sys.stdout
 
 from scraper import MercadoLivreScraper
 from amazon_scraper import AmazonScraper
+from aliexpress_scraper import AliExpressScraper
 from database import init_db, is_already_posted, mark_as_posted, get_posted_count
 import config
 from telegram_sender import send_deal_to_telegram
@@ -40,7 +41,7 @@ def run_active_window(preview_only: bool = False):
     """
     Executa a janela ativa de envios:
     Envia links sem parar durante config.ACTIVE_SEND_MINUTES minutos (padrão: 5 minutos).
-    Alterna ofertas do Mercado Livre e da Amazon.
+    Alterna ofertas do Mercado Livre, da Amazon e do AliExpress.
     """
     duration_seconds = config.ACTIVE_SEND_MINUTES * 60
     start_time = time.time()
@@ -50,7 +51,7 @@ def run_active_window(preview_only: bool = False):
     print("=" * 65)
     print(f"🚀 [FASE ATIVA INICIADA] ENVIANDO LINKS POR {config.ACTIVE_SEND_MINUTES} MINUTOS SEM PARAR")
     print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento previsto: {end_dt.strftime('%H:%M:%S')}")
-    print(f"   Fontes: Mercado Livre (Afiliado Lucas) + Amazon (Afiliado Pedro)")
+    print(f"   Fontes: Mercado Livre (Lucas) + Amazon (Pedro) + AliExpress")
     print(f"   Desconto mínimo: {config.MIN_DISCOUNT_PCT}% | Intervalo entre posts: {config.POST_DELAY_SECONDS}s")
     print(f"   Total já catalogado no banco: {get_posted_count()} produtos")
     print("=" * 65)
@@ -73,14 +74,25 @@ def run_active_window(preview_only: bool = False):
     except Exception as e:
         print(f"⚠️ [Amazon] Erro na coleta: {e}")
 
-    # 3. Intercala as ofertas das duas lojas para diversificar o grupo
+    # 3. Coleta AliExpress
+    ali_deals = []
+    try:
+        ali_scraper = AliExpressScraper(aff_fsk=config.ALIEXPRESS_AFF_FSK)
+        ali_deals = ali_scraper.get_mais_vendidos(min_discount_pct=config.MIN_DISCOUNT_PCT)
+        print(f"📦 [AliExpress] {len(ali_deals)} ofertas coletadas.")
+    except Exception as e:
+        print(f"⚠️ [AliExpress] Erro na coleta: {e}")
+
+    # 4. Intercala as ofertas das três lojas para diversificar o grupo
     combined_deals = []
-    max_len = max(len(meli_deals), len(amazon_deals))
+    max_len = max(len(meli_deals), len(amazon_deals), len(ali_deals))
     for i in range(max_len):
         if i < len(meli_deals):
             combined_deals.append(meli_deals[i])
         if i < len(amazon_deals):
             combined_deals.append(amazon_deals[i])
+        if i < len(ali_deals):
+            combined_deals.append(ali_deals[i])
 
     if not combined_deals:
         print("⚠️ Nenhuma oferta encontrada com os critérios definidos.")
@@ -103,7 +115,13 @@ def run_active_window(preview_only: bool = False):
         remaining_seconds = max(0, int(end_time - time.time()))
         rem_min = remaining_seconds // 60
         rem_sec = remaining_seconds % 60
-        loja_nome = "AMAZON" if getattr(deal, "source", "") == "amazon" else "MERCADO LIVRE"
+        source = getattr(deal, "source", "")
+        if source == "amazon":
+            loja_nome = "AMAZON"
+        elif source == "aliexpress":
+            loja_nome = "ALIEXPRESS"
+        else:
+            loja_nome = "MERCADO LIVRE"
 
         print(f"\n🎯 [POSTANDO #{posted_in_window + 1} - {loja_nome}] ({deal.discount_pct}% OFF) - Faltam {rem_min:02d}:{rem_sec:02d}")
         print(f"   Título: {deal.title}")

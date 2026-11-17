@@ -1,6 +1,6 @@
-# 🛒 Bot de Melhores Ofertas do Mercado Livre + Amazon (com Afiliados)
+# 🛒 Bot de Melhores Ofertas Multi-Lojas (Mercado Livre + Amazon + AliExpress)
 
-Este bot monitora automaticamente os **produtos mais vendidos e com maiores descontos** do **Mercado Livre** e da **Amazon Brasil**, filtra as melhores ofertas e publica automaticamente cards promocionais com foto, preço, cálculo de desconto e tags de afiliado em canais ou grupos do **Telegram**.
+Este bot monitora automaticamente os **produtos mais vendidos e com maiores descontos** do **Mercado Livre**, da **Amazon Brasil** e do **AliExpress**, filtra as melhores ofertas e publica automaticamente cards promocionais com foto, preço, cálculo de desconto e tags de afiliado em canais ou grupos do **Telegram**.
 
 ---
 
@@ -8,12 +8,15 @@ Este bot monitora automaticamente os **produtos mais vendidos e com maiores desc
 
 Para que as comissões sejam atribuídas corretamente a cada plataforma, basta preencher as suas credenciais no arquivo `.env`:
 
-### Mercado Livre
+### 1. Mercado Livre
 - **`MATT_TOOL`**: ID da ferramenta de afiliado
 - **`MATT_WORD`**: Palavra-chave/identificador de afiliado
 
-### Amazon Brasil
+### 2. Amazon Brasil
 - **`AMAZON_AFFILIATE_TAG`**: Tag de associado da Amazon (ex: `suatag-20`)
+
+### 3. AliExpress
+- **`ALIEXPRESS_AFF_FSK`**: Código curto de rastreamento / FSK do AliExpress (ex: `_mqTQekn`)
 
 Os links gerados recebem automaticamente os parâmetros de rastreamento de cada plataforma.
 

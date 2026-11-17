@@ -11,6 +11,9 @@ MATT_WORD = os.getenv("MATT_WORD", "")
 # Credenciais de Afiliado Amazon (obtidas no .env)
 AMAZON_AFFILIATE_TAG = os.getenv("AMAZON_AFFILIATE_TAG", "")
 
+# Credenciais de Afiliado AliExpress (obtidas no .env)
+ALIEXPRESS_AFF_FSK = os.getenv("ALIEXPRESS_AFF_FSK", "_mqTQekn")
+
 # Filtros de Ofertas e Ciclos de Envio
 MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))  # Desconto mínimo (%)
 ACTIVE_SEND_MINUTES = int(os.getenv("ACTIVE_SEND_MINUTES", "5")) # Minutos enviando ofertas sem parar

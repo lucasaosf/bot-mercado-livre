@@ -9,14 +9,20 @@ urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 
 def format_telegram_caption(deal: Deal) -> str:
     """Formata o texto da mensagem no padrão clássico de canais de promoções."""
-    is_amazon = getattr(deal, "source", "") == "amazon"
+    source = getattr(deal, "source", "")
     
-    if is_amazon:
+    if source == "amazon":
         if deal.discount_pct:
             header = f"📦 <b>ACHADO NA AMAZON — {deal.discount_pct}% OFF!</b>"
         else:
             header = "📦 <b>MAIS VENDIDOS DA AMAZON!</b>"
         store_name = "Amazon"
+    elif source == "aliexpress":
+        if deal.discount_pct:
+            header = f"🛍️ <b>ACHADO NO ALIEXPRESS — {deal.discount_pct}% OFF!</b>"
+        else:
+            header = "🛍️ <b>MAIS VENDIDOS DO ALIEXPRESS!</b>"
+        store_name = "AliExpress"
     else:
         if deal.discount_pct:
             header = f"🔥 <b>OFERTA MERCADO LIVRE — {deal.discount_pct}% OFF!</b>"
@@ -54,8 +60,13 @@ def send_deal_to_telegram(bot_token: str, chat_id: str, deal: Deal) -> bool:
         return False
 
     caption = format_telegram_caption(deal)
-    is_amazon = getattr(deal, "source", "") == "amazon"
-    btn_text = "🛒 Ver Oferta na Amazon" if is_amazon else "🛒 Ver Oferta no Mercado Livre"
+    source = getattr(deal, "source", "")
+    if source == "amazon":
+        btn_text = "🛒 Ver Oferta na Amazon"
+    elif source == "aliexpress":
+        btn_text = "🛒 Ver Oferta no AliExpress"
+    else:
+        btn_text = "🛒 Ver Oferta no Mercado Livre"
 
     # Se houver imagem, envia como sendPhoto
     if deal.image_url:
