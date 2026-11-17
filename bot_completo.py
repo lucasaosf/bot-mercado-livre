@@ -60,7 +60,7 @@ MIN_DISCOUNT_PCT = int(os.getenv("MIN_DISCOUNT_PCT", "20"))      # Desconto mín
 ACTIVE_SEND_MINUTES = int(os.getenv("ACTIVE_SEND_MINUTES", "5")) # Minutos enviando ofertas sem parar
 REST_MINUTES = int(os.getenv("REST_MINUTES", "10"))              # Minutos de descanso
 POST_DELAY_SECONDS = int(os.getenv("POST_DELAY_SECONDS", "6"))   # Intervalo entre envios (segundos)
-REPOST_AFTER_DAYS = int(os.getenv("REPOST_AFTER_DAYS", "3"))     # Dias de carência antes de reenviar o mesmo item
+REPOST_AFTER_HOURS = float(os.getenv("REPOST_AFTER_HOURS", "12")) # Horas de carência antes de reenviar o mesmo item
 
 # =============================================================================
 # 🗄️ BANCO DE DADOS SQLITE LOCAL (Controle anti-repetição)
@@ -83,11 +83,40 @@ def init_db():
         """)
         conn.commit()
 
-def is_already_posted(item_id: str, max_days: int = 3) -> bool:
-    cutoff = datetime.now() - timedelta(days=max_days)
+def is_already_posted(item_id: str, max_hours: float = 12.0) -> bool:
+    cutoff = datetime.now() - timedelta(hours=max_hours)
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
             "SELECT id FROM posted_deals WHERE item_id = ? AND posted_at >= ?",
+            (item_id, cutoff.isoformat())
+        ).fetchone()
+        return row is not None
+
+def filter_and_rank_deals(deals: List["Deal"], max_hours: float = 12.0) -> List["Deal"]:
+    if not deals:
+        return []
+    cutoff = (datetime.now() - timedelta(hours=max_hours)).isoformat()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute("SELECT item_id, posted_at FROM posted_deals")
+        posted_map = dict(cursor.fetchall())
+
+    fresh_deals = []
+    older_deals = []
+
+    for d in deals:
+        last_posted = posted_map.get(d.item_id)
+        if not last_posted:
+            fresh_deals.append(d)
+        elif last_posted < cutoff:
+            fresh_deals.append(d)
+        else:
+            older_deals.append((last_posted, d))
+
+    if fresh_deals:
+        return fresh_deals
+
+    older_deals.sort(key=lambda x: x[0])
+    return [d for _, d in older_deals]
             (item_id, cutoff.isoformat())
         ).fetchone()
         return row is not None
@@ -558,48 +587,62 @@ def run_active_window():
     ali_deals = ali_scraper.get_mais_vendidos(min_discount_pct=MIN_DISCOUNT_PCT)
     print(f"📦 [AliExpress] {len(ali_deals)} ofertas coletadas.")
 
-    # 4. Intercala as ofertas das 3 plataformas
-    combined_deals = []
-    max_len = max(len(meli_deals), len(amazon_deals), len(ali_deals))
-    for i in range(max_len):
-        if i < len(meli_deals):
-            combined_deals.append(meli_deals[i])
-        if i < len(amazon_deals):
-            combined_deals.append(amazon_deals[i])
-        if i < len(ali_deals):
-            combined_deals.append(ali_deals[i])
+    # 4. Prepara as filas independentes com estoque garantido
+    queue_meli = filter_and_rank_deals(meli_deals, max_hours=REPOST_AFTER_HOURS)
+    queue_amazon = filter_and_rank_deals(amazon_deals, max_hours=REPOST_AFTER_HOURS)
+    queue_ali = filter_and_rank_deals(ali_deals, max_hours=REPOST_AFTER_HOURS)
 
-    if not combined_deals:
-        print("⚠️ Nenhuma oferta encontrada nesta busca.")
-        return 0
+    print(f"📊 Filas disponíveis (1:1:1): ML: {len(queue_meli)} | Amazon: {len(queue_amazon)} | AliExpress: {len(queue_ali)}")
 
     posted = 0
+    counts = {"mercadolivre": 0, "amazon": 0, "aliexpress": 0}
     seen = set()
 
-    for deal in combined_deals:
-        if time.time() >= end_time:
+    queues = [
+        ("mercadolivre", "MERCADO LIVRE", queue_meli),
+        ("amazon", "AMAZON", queue_amazon),
+        ("aliexpress", "ALIEXPRESS", queue_ali)
+    ]
+    store_idx = 0
+    pointers = {"mercadolivre": 0, "amazon": 0, "aliexpress": 0}
+
+    while time.time() < end_time:
+        if all(pointers[s_id] >= len(q) for s_id, _, q in queues):
             break
 
-        if deal.item_id in seen or is_already_posted(deal.item_id, max_days=REPOST_AFTER_DAYS):
+        s_id, s_name, s_queue = queues[store_idx % len(queues)]
+        store_idx += 1
+
+        deal_to_send = None
+        while pointers[s_id] < len(s_queue):
+            candidate = s_queue[pointers[s_id]]
+            pointers[s_id] += 1
+            if candidate.item_id not in seen:
+                deal_to_send = candidate
+                break
+
+        if not deal_to_send:
             continue
 
-        seen.add(deal.item_id)
+        seen.add(deal_to_send.item_id)
         rem = max(0, int(end_time - time.time()))
-        print(f"\n🎯 [POSTANDO #{posted + 1} - {deal.source.upper()}] - Faltam {rem//60:02d}:{rem%60:02d}")
-        print(f"   {deal.title[:65]}...")
-        orig = f" (De R$ {deal.original_price:.2f})" if deal.original_price else ""
-        print(f"   Preço: R$ {deal.price:.2f}{orig} -> {deal.discount_pct}% OFF")
-        print(f"   Link Afiliado: {deal.affiliate_url}")
+        print(f"\n🎯 [POSTANDO #{posted + 1} - {s_name}] - Faltam {rem//60:02d}:{rem%60:02d}")
+        print(f"   {deal_to_send.title[:65]}...")
+        orig = f" (De R$ {deal_to_send.original_price:.2f})" if deal_to_send.original_price else ""
+        print(f"   Preço: R$ {deal_to_send.price:.2f}{orig} -> {deal_to_send.discount_pct}% OFF")
+        print(f"   Link Afiliado: {deal_to_send.affiliate_url}")
 
-        if send_telegram(deal):
-            mark_as_posted(deal)
+        if send_telegram(deal_to_send):
+            mark_as_posted(deal_to_send)
             posted += 1
+            counts[s_id] += 1
 
         wait_sec = min(float(POST_DELAY_SECONDS), max(0.0, end_time - time.time()))
         if wait_sec > 0:
             time.sleep(wait_sec)
 
     print(f"\n🏁 [FASE ATIVA CONCLUÍDA] {posted} ofertas enviadas com sucesso!")
+    print(f"   Distribuição rigorosa 1:1:1: Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
     return posted
 
 def main():
