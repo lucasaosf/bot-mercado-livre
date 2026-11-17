@@ -46,8 +46,8 @@ python bot.py --preview
 python bot.py --once
 ```
 
-#### C. Executar em modo contínuo (Automático):
-O bot rodará periodicamente a cada X minutos (configurado no `.env`):
+#### C. Executar em modo contínuo de ciclos (Recomendado):
+O bot enviará ofertas durante 5 minutos sem parar e descansará por 10 minutos antes de repetir o ciclo:
 ```bash
 python bot.py --loop
 ```
@@ -66,15 +66,16 @@ Se quiser que o bot poste automaticamente em um Canal ou Grupo do Telegram:
    TELEGRAM_BOT_TOKEN="seu_token_aqui"
    TELEGRAM_CHAT_ID="@nomedoseucanal" # ou o ID numérico do grupo (ex: -100xxxxxxxxxx)
    ```
-5. Execute `python bot.py --once` ou `python bot.py --loop`.
+5. Execute `python bot.py --loop`.
 
 ---
 
 ## ⚙️ Ajuste de Preferências (`.env`)
 
-Você pode alterar os filtros a qualquer momento no arquivo `.env`:
+Você pode alterar o ritmo e filtros a qualquer momento no arquivo `.env`:
 
-- `MIN_DISCOUNT_PCT`: Desconto mínimo para postar (ex: `30` para apenas 30%+ de desconto).
-- `MAX_POSTS_PER_RUN`: Quantidade máxima de ofertas postadas em cada rodada (ex: `5`).
-- `CHECK_INTERVAL_MINUTES`: Minutos de intervalo entre cada busca no modo `--loop` (ex: `60`).
-- `REPOST_AFTER_DAYS`: Dias que o bot deve esperar antes de permitir reenviar o mesmo produto caso continue em oferta (ex: `3`).
+- `MIN_DISCOUNT_PCT`: Desconto mínimo para postar (ex: `20` para produtos com 20%+ OFF).
+- `ACTIVE_SEND_MINUTES`: Duração da janela ativa de envios sem parar (padrão: `5` minutos).
+- `REST_MINUTES`: Tempo de descanso antes de iniciar o próximo ciclo (padrão: `10` minutos).
+- `POST_DELAY_SECONDS`: Intervalo entre mensagens no Telegram para manter o ritmo sem risco de bloqueio (padrão: `6` segundos).
+- `REPOST_AFTER_DAYS`: Dias que o bot deve esperar antes de permitir reenviar o mesmo produto caso continue em oferta (padrão: `3`).
