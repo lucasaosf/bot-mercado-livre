@@ -54,7 +54,7 @@ def run_active_window(preview_only: bool = False):
     print("=" * 65)
     print(f"🚀 [FASE ATIVA INICIADA] ENVIANDO LINKS POR {config.ACTIVE_SEND_MINUTES} MINUTOS SEM PARAR")
     print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento previsto: {end_dt.strftime('%H:%M:%S')}")
-    print(f"   Proporção: RIGOROSA ROTAÇÃO 1:1:1 (Mercado Livre -> Amazon -> AliExpress)")
+    print(f"   Proporção: 50% Mercado Livre | 25% Amazon | 25% AliExpress (Rotação 2:1:1)")
     print(f"   Desconto mínimo: {config.MIN_DISCOUNT_PCT}% | Intervalo entre posts: {config.POST_DELAY_SECONDS}s")
     print(f"   Total já catalogado no banco: {get_posted_count()} produtos")
     print("=" * 65)
@@ -104,10 +104,11 @@ def run_active_window(preview_only: bool = False):
     counts = {"mercadolivre": 0, "amazon": 0, "aliexpress": 0}
     seen_in_window = set()
 
-    # Rotação circular estrita 1:1:1
+    # Rotação balanceada: 50% Mercado Livre, 25% Amazon, 25% AliExpress (Padrão 2:1:1)
     queues = [
         ("mercadolivre", "MERCADO LIVRE", queue_meli),
         ("amazon", "AMAZON", queue_amazon),
+        ("mercadolivre", "MERCADO LIVRE", queue_meli),
         ("aliexpress", "ALIEXPRESS", queue_ali)
     ]
     store_idx = 0
@@ -173,7 +174,7 @@ def run_active_window(preview_only: bool = False):
     print("\n" + "=" * 65)
     print(f"🏁 [JANELA ATIVA DE {config.ACTIVE_SEND_MINUTES} MINUTOS CONCLUÍDA]")
     print(f"   Total enviado: {posted_in_window}")
-    print(f"   Distribuição rigorosa 1:1:1: Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
+    print(f"   Distribuição (50% ML / 25% AMZ / 25% ALI): Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
     print("=" * 65)
     return posted_in_window
 

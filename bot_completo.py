@@ -569,7 +569,7 @@ def run_active_window():
     print("=" * 65)
     print(f"🚀 [FASE ATIVA] ENVIANDO LINKS POR {ACTIVE_SEND_MINUTES} MINUTOS SEM PARAR")
     print(f"   Início: {datetime.now().strftime('%H:%M:%S')} | Encerramento: {end_dt.strftime('%H:%M:%S')}")
-    print(f"   Fontes: Mercado Livre (Lucas) + Amazon (Pedro) + AliExpress")
+    print(f"   Fontes: 50% Mercado Livre (Lucas) + 25% Amazon (Pedro) + 25% AliExpress (Pedro)")
     print(f"   Catalogados no banco: {get_posted_count()} produtos")
     print("=" * 65)
 
@@ -593,7 +593,7 @@ def run_active_window():
     queue_amazon = filter_and_rank_deals(amazon_deals, max_hours=REPOST_AFTER_HOURS)
     queue_ali = filter_and_rank_deals(ali_deals, max_hours=REPOST_AFTER_HOURS)
 
-    print(f"📊 Filas disponíveis (1:1:1): ML: {len(queue_meli)} | Amazon: {len(queue_amazon)} | AliExpress: {len(queue_ali)}")
+    print(f"📊 Filas disponíveis (50% ML / 25% AMZ / 25% ALI): ML: {len(queue_meli)} | Amazon: {len(queue_amazon)} | AliExpress: {len(queue_ali)}")
 
     posted = 0
     counts = {"mercadolivre": 0, "amazon": 0, "aliexpress": 0}
@@ -602,6 +602,7 @@ def run_active_window():
     queues = [
         ("mercadolivre", "MERCADO LIVRE", queue_meli),
         ("amazon", "AMAZON", queue_amazon),
+        ("mercadolivre", "MERCADO LIVRE", queue_meli),
         ("aliexpress", "ALIEXPRESS", queue_ali)
     ]
     store_idx = 0
@@ -643,7 +644,7 @@ def run_active_window():
             time.sleep(wait_sec)
 
     print(f"\n🏁 [FASE ATIVA CONCLUÍDA] {posted} ofertas enviadas com sucesso!")
-    print(f"   Distribuição rigorosa 1:1:1: Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
+    print(f"   Distribuição (50% ML / 25% AMZ / 25% ALI): Mercado Livre: {counts['mercadolivre']} | Amazon: {counts['amazon']} | AliExpress: {counts['aliexpress']}")
     return posted
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
