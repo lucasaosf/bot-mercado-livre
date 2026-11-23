@@ -56,7 +56,7 @@ class MercadoLivreScraper:
         """Pega as melhores ofertas da página de Mais Vendidos."""
         url = "https://www.mercadolivre.com.br/mais-vendidos"
         try:
-            response = requests.get(url, headers=self.headers, impersonate="chrome")
+            response = requests.get(url, headers=self.headers, impersonate="chrome", timeout=15)
         except Exception as e:
             print(f"Erro ao acessar Mercado Livre: {e}")
             return []

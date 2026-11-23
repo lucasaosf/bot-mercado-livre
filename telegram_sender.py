@@ -1,4 +1,5 @@
 import socket
+import html
 import requests
 import urllib3.util.connection as urllib3_cn
 from typing import Optional
@@ -30,10 +31,11 @@ def format_telegram_caption(deal: Deal) -> str:
             header = "🔥 <b>MAIS VENDIDOS DO MERCADO LIVRE!</b>"
         store_name = "Mercado Livre"
 
+    safe_title = html.escape(deal.title, quote=False)
     lines = [
         header,
         "",
-        f"🏷️ <b>{deal.title}</b>",
+        f"🏷️ <b>{safe_title}</b>",
         ""
     ]
 

@@ -17,6 +17,7 @@ import os
 import sys
 import time
 import re
+import html
 import socket
 import sqlite3
 import json
@@ -119,9 +120,6 @@ def filter_and_rank_deals(deals: List["Deal"], max_hours: float = 12.0) -> List[
 
     older_deals.sort(key=lambda x: x[0])
     return [d for _, d in older_deals]
-            (item_id, cutoff.isoformat())
-        ).fetchone()
-        return row is not None
 
 def mark_as_posted(deal) -> None:
     with sqlite3.connect(DB_PATH) as conn:
@@ -493,10 +491,11 @@ def format_caption(deal: Deal) -> str:
         header = f"🔥 <b>OFERTA MERCADO LIVRE — {deal.discount_pct}% OFF!</b>" if deal.discount_pct else "🔥 <b>MAIS VENDIDOS DO MERCADO LIVRE!</b>"
         store_name = "Mercado Livre"
 
+    safe_title = html.escape(deal.title, quote=False)
     lines = [
         header,
         "",
-        f"🏷️ <b>{deal.title}</b>",
+        f"🏷️ <b>{safe_title}</b>",
         ""
     ]
     if deal.original_price and deal.original_price > deal.price:
